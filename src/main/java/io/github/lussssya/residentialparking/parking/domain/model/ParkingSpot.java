@@ -19,7 +19,7 @@ public class ParkingSpot {
 
         Objects.requireNonNull(code, "Parking spot code should not be null.");
         if (code.isBlank()) {
-            throw new IllegalArgumentException("Parking spot code should must not be blank.");
+            throw new IllegalArgumentException("Parking spot code should not be blank.");
         }
         this.code = code.strip();
 
