@@ -14,16 +14,19 @@ public class ParkingSpot {
     private ParkingSpotStatus status;
 
     public ParkingSpot (UUID id, UUID communityId, String code) {
+        this(id, communityId, code, ParkingSpotStatus.ACTIVE);
+    }
+
+    private ParkingSpot (UUID id, UUID communityId, String code, ParkingSpotStatus status) {
         this.id = Objects.requireNonNull(id, "Parking spot ID should not be null.");
         this.communityId = Objects.requireNonNull(communityId, "Community ID should not be null.");
-
         Objects.requireNonNull(code, "Parking spot code should not be null.");
         if (code.isBlank()) {
             throw new IllegalArgumentException("Parking spot code should not be blank.");
         }
         this.code = code.strip();
 
-        this.status = ParkingSpotStatus.ACTIVE;
+        this.status = Objects.requireNonNull(status, "Status should not be null.");;
     }
 
     public void activate () {
@@ -40,4 +43,7 @@ public class ParkingSpot {
         status = ParkingSpotStatus.INOPERATIVE;
     }
 
+    public static ParkingSpot fromExistingState (UUID id, UUID communityId, String code, ParkingSpotStatus status) {
+        return new ParkingSpot(id, communityId, code, status);
+    }
 }
