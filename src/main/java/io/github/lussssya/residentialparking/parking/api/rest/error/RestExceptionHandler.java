@@ -1,6 +1,7 @@
 package io.github.lussssya.residentialparking.parking.api.rest.error;
 
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -42,6 +43,13 @@ public class RestExceptionHandler {
             HttpServletRequest request
     ) {
         return build(HttpStatus.BAD_REQUEST, "Invalid value for '" + exception.getName() + "'.", request);
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ApiErrorResponse> handleDataIntegrityViolation (
+            HttpServletRequest request
+    ) {
+        return build(HttpStatus.CONFLICT, "The request conflicts with existing data or a concurrent change.", request);
     }
 
     private ResponseEntity<ApiErrorResponse> build (HttpStatus status, String message, HttpServletRequest request) {
