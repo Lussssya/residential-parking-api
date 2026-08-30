@@ -119,4 +119,126 @@ class ParkingSessionTest {
                 () -> assertNull(session.getFinishedAt())
         );
     }
+
+    @Test
+    void restoresActiveParkingSessionFromExistingState () {
+        ParkingSession session = ParkingSession.fromExistingState(
+                SESSION_ID,
+                BOOKING_ID,
+                SPOT_ID,
+                VEHICLE_ID,
+                STARTED_AT,
+                null,
+                ParkingSessionStatus.ACTIVE
+        );
+
+        assertAll(
+                () -> assertEquals(SESSION_ID, session.getId()),
+                () -> assertEquals(BOOKING_ID, session.getBookingId()),
+                () -> assertEquals(SPOT_ID, session.getSpotId()),
+                () -> assertEquals(VEHICLE_ID, session.getVehicleId()),
+                () -> assertEquals(STARTED_AT, session.getStartedAt()),
+                () -> assertNull(session.getFinishedAt()),
+                () -> assertEquals(
+                        ParkingSessionStatus.ACTIVE,
+                        session.getStatus()
+                )
+        );
+    }
+
+    @Test
+    void restoresFinishedParkingSessionFromExistingState () {
+        ParkingSession session = ParkingSession.fromExistingState(
+                SESSION_ID,
+                BOOKING_ID,
+                SPOT_ID,
+                VEHICLE_ID,
+                STARTED_AT,
+                FINISHED_AT,
+                ParkingSessionStatus.FINISHED
+        );
+
+        assertAll(
+                () -> assertEquals(SESSION_ID, session.getId()),
+                () -> assertEquals(BOOKING_ID, session.getBookingId()),
+                () -> assertEquals(SPOT_ID, session.getSpotId()),
+                () -> assertEquals(VEHICLE_ID, session.getVehicleId()),
+                () -> assertEquals(STARTED_AT, session.getStartedAt()),
+                () -> assertEquals(FINISHED_AT, session.getFinishedAt()),
+                () -> assertEquals(ParkingSessionStatus.FINISHED, session.getStatus())
+        );
+    }
+
+    @Test
+    void rejectsActiveExistingStateWithFinishTime () {
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> ParkingSession.fromExistingState(SESSION_ID,
+                        BOOKING_ID,
+                        SPOT_ID,
+                        VEHICLE_ID,
+                        STARTED_AT,
+                        FINISHED_AT,
+                        ParkingSessionStatus.ACTIVE
+                )
+        );
+    }
+
+    @Test
+    void rejectsFinishedExistingStateWithoutValidFinishTime () {
+        assertAll(
+                () -> assertThrows(
+                        NullPointerException.class,
+                        () -> ParkingSession.fromExistingState(
+                                SESSION_ID,
+                                BOOKING_ID,
+                                SPOT_ID,
+                                VEHICLE_ID,
+                                STARTED_AT,
+                                null,
+                                ParkingSessionStatus.FINISHED
+                        )
+                ),
+                () -> assertThrows(
+                        IllegalArgumentException.class,
+                        () -> ParkingSession.fromExistingState(
+                                SESSION_ID,
+                                BOOKING_ID,
+                                SPOT_ID,
+                                VEHICLE_ID,
+                                STARTED_AT,
+                                STARTED_AT,
+                                ParkingSessionStatus.FINISHED
+                        )
+                ),
+                () -> assertThrows(
+                        IllegalArgumentException.class,
+                        () -> ParkingSession.fromExistingState(
+                                SESSION_ID,
+                                BOOKING_ID,
+                                SPOT_ID,
+                                VEHICLE_ID,
+                                STARTED_AT,
+                                STARTED_AT.minusSeconds(1),
+                                ParkingSessionStatus.FINISHED
+                        )
+                )
+        );
+    }
+
+    @Test
+    void rejectsExistingStateWithNullStatus () {
+        assertThrows(
+                NullPointerException.class,
+                () -> ParkingSession.fromExistingState(
+                        SESSION_ID,
+                        BOOKING_ID,
+                        SPOT_ID,
+                        VEHICLE_ID,
+                        STARTED_AT,
+                        null,
+                        null
+                )
+        );
+    }
 }

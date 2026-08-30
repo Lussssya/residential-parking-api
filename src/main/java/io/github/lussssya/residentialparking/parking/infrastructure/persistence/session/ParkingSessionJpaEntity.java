@@ -42,17 +42,17 @@ public class ParkingSessionJpaEntity {
         this.status = status;
     }
 
-    public static ParkingSessionJpaEntity fromDomain (ParkingSession booking) {
-        Objects.requireNonNull(booking, "Parking session should not be null.");
+    public static ParkingSessionJpaEntity fromDomain (ParkingSession parkingSession) {
+        Objects.requireNonNull(parkingSession, "Parking session should not be null.");
 
         return new ParkingSessionJpaEntity(
-                booking.getId(),
-                booking.getBookingId(),
-                booking.getSpotId(),
-                booking.getVehicleId(),
-                booking.getStartedAt(),
-                booking.getFinishedAt(),
-                booking.getStatus()
+                parkingSession.getId(),
+                parkingSession.getBookingId(),
+                parkingSession.getSpotId(),
+                parkingSession.getVehicleId(),
+                parkingSession.getStartedAt(),
+                parkingSession.getFinishedAt(),
+                parkingSession.getStatus()
         );
     }
 

@@ -34,7 +34,7 @@ public class ParkingSessionService {
 
         final UUID parkingSpotId = booking.getSpotId();
         if (parkingSessionRepository.existsByBookingId(bookingId)) {
-            throw new IllegalStateException("Can not start session over another active session");
+            throw new IllegalStateException("A parking session already exists for this booking.");
         }
         ParkingSpot parkingSpot = parkingSpotRepository.findById(parkingSpotId).orElseThrow(
                 () -> new NoSuchElementException("No parking spot with such Id.")
