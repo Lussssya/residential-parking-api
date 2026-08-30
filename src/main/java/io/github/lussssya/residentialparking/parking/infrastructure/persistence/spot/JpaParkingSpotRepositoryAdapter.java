@@ -5,6 +5,8 @@ import io.github.lussssya.residentialparking.parking.domain.repository.ParkingSp
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -16,6 +18,18 @@ public class JpaParkingSpotRepositoryAdapter implements ParkingSpotRepository {
     @Override
     public Optional<ParkingSpot> findById (UUID id) {
         return parkingSpotRepository.findById(id).map(ParkingSpotJpaEntity::toDomain);
+    }
+
+    @Override
+    public List<ParkingSpot> findAllByCommunityId (UUID communityId) {
+        List<ParkingSpotJpaEntity> jpaEntities = parkingSpotRepository.findAllByCommunityId(communityId);
+
+        List<ParkingSpot> parkingSpots = new ArrayList<>();
+        for (ParkingSpotJpaEntity jpaEntity : jpaEntities) {
+            parkingSpots.add(jpaEntity.toDomain());
+        }
+
+        return parkingSpots;
     }
 
     @Override
