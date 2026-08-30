@@ -10,6 +10,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.util.NoSuchElementException;
 import java.util.UUID;
 
 import static org.hamcrest.Matchers.nullValue;
@@ -116,5 +117,68 @@ class ParkingSessionControllerTest {
                 .andExpect(status().isBadRequest());
 
         verifyNoInteractions(parkingSessionService);
+    }
+
+    @Test
+    void returnsBadRequestForIllegalArgumentException () throws Exception {
+        when(clock.instant()).thenReturn(SESSION_START);
+        when(parkingSessionService.startSession(BOOKING_ID, SESSION_START))
+                .thenThrow(new IllegalArgumentException(
+                        "Parking session cannot start at this time."
+                ));
+
+        mockMvc.perform(post(
+                        "/api/bookings/{bookingId}/parking-session",
+                        BOOKING_ID
+                ))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.error").value("Bad Request"))
+                .andExpect(jsonPath("$.message").value(
+                        "Parking session cannot start at this time."
+                ))
+                .andExpect(jsonPath("$.path").value(
+                        "/api/bookings/" + BOOKING_ID + "/parking-session"
+                ));
+    }
+
+    @Test
+    void returnsNotFoundForMissingBooking () throws Exception {
+        when(clock.instant()).thenReturn(SESSION_START);
+        when(parkingSessionService.startSession(BOOKING_ID, SESSION_START))
+                .thenThrow(new NoSuchElementException(
+                        "Booking was not found."
+                ));
+
+        mockMvc.perform(post(
+                        "/api/bookings/{bookingId}/parking-session",
+                        BOOKING_ID
+                ))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.status").value(404))
+                .andExpect(jsonPath("$.error").value("Not Found"))
+                .andExpect(jsonPath("$.message").value(
+                        "Booking was not found."
+                ));
+    }
+
+    @Test
+    void returnsConflictWhenSessionCannotBeStarted () throws Exception {
+        when(clock.instant()).thenReturn(SESSION_START);
+        when(parkingSessionService.startSession(BOOKING_ID, SESSION_START))
+                .thenThrow(new IllegalStateException(
+                        "A parking session already exists for this booking."
+                ));
+
+        mockMvc.perform(post(
+                        "/api/bookings/{bookingId}/parking-session",
+                        BOOKING_ID
+                ))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.status").value(409))
+                .andExpect(jsonPath("$.error").value("Conflict"))
+                .andExpect(jsonPath("$.message").value(
+                        "A parking session already exists for this booking."
+                ));
     }
 }
