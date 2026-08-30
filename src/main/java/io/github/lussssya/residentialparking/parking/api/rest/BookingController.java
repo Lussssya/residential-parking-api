@@ -8,13 +8,18 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.Clock;
+import java.time.Instant;
+import java.util.UUID;
+
 @RestController
-@RequestMapping("/api/bookings")
+@RequestMapping("/api")
 @RequiredArgsConstructor
 public class BookingController {
     private final BookingService bookingService;
+    private final Clock clock;
 
-    @PostMapping
+    @PostMapping("/bookings")
     @ResponseStatus(HttpStatus.CREATED)
     public BookingResponse createBooking (@Valid @RequestBody BookingRequest request) {
         TimeRange timeRange = new TimeRange(request.start(), request.end());
@@ -26,5 +31,15 @@ public class BookingController {
                 timeRange);
 
         return BookingResponse.from(booking);
+    }
+
+    @GetMapping("/residents/{residentId}/bookings")
+    public ResidentBookingsResponse findCurrentAndFutureBookings (@PathVariable UUID residentId) {
+        return ResidentBookingsResponse.from(
+                bookingService.findCurrentAndFutureBookings(
+                        residentId,
+                        Instant.now(clock)
+                )
+        );
     }
 }

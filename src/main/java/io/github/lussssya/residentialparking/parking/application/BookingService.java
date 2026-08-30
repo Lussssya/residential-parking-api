@@ -10,9 +10,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.NoSuchElementException;
-import java.util.Objects;
-import java.util.UUID;
+import java.time.Instant;
+import java.util.*;
 
 @Service
 @RequiredArgsConstructor
@@ -42,5 +41,25 @@ public class BookingService {
         final Booking booking = new Booking(UUID.randomUUID(), communityId, spotId, residentId, vehicleId, timeRange);
         bookingRepository.save(booking);
         return booking;
+    }
+
+    @Transactional(readOnly = true)
+    public ResidentBookings findCurrentAndFutureBookings (UUID residentId, Instant now) {
+        Objects.requireNonNull(residentId, "Resident Id should not be null.");
+        Objects.requireNonNull(now, "Current time should not be null.");
+
+        List<Booking> bookings = bookingRepository.findCurrentAndFutureByResidentId(residentId, now);
+        List<Booking> currentBookings = new ArrayList<>();
+        List<Booking> futureBookings = new ArrayList<>();
+
+        for (Booking booking : bookings) {
+            if (!booking.getTimeRange().start().isAfter(now)) {
+                currentBookings.add(booking);
+            } else {
+                futureBookings.add(booking);
+            }
+        }
+
+        return new ResidentBookings(currentBookings, futureBookings);
     }
 }

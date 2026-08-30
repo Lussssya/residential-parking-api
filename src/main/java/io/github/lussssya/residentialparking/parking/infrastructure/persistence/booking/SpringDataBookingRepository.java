@@ -7,6 +7,7 @@ import org.springframework.data.repository.query.Param;
 
 import java.time.Instant;
 import java.util.Collection;
+import java.util.List;
 import java.util.UUID;
 
 public interface SpringDataBookingRepository extends JpaRepository<BookingJpaEntity, UUID> {
@@ -19,10 +20,15 @@ public interface SpringDataBookingRepository extends JpaRepository<BookingJpaEnt
               AND booking.startTime < :requestedEnd
               AND :requestedStart < booking.endTime
             """)
-    boolean existsOverlappingBooking (
-            @Param("spotId") UUID spotId,
-            @Param("requestedStart") Instant requestedStart,
-            @Param("requestedEnd") Instant requestedEnd,
-            @Param("statuses") Collection<BookingStatus> statuses
-    );
+    boolean existsOverlappingBooking (@Param("spotId") UUID spotId, @Param("requestedStart") Instant requestedStart, @Param("requestedEnd") Instant requestedEnd, @Param("statuses") Collection<BookingStatus> statuses);
+
+    @Query("""
+            SELECT booking
+            FROM BookingJpaEntity booking
+            WHERE booking.residentId = :residentId
+              AND booking.endTime > :now
+              AND booking.status IN :statuses
+            ORDER BY booking.startTime ASC
+            """)
+    List<BookingJpaEntity> findCurrentAndFutureByResidentId (UUID residentId, Instant now, Collection<BookingStatus> statuses);
 }

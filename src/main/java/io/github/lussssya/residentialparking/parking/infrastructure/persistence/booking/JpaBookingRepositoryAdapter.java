@@ -7,9 +7,8 @@ import io.github.lussssya.residentialparking.parking.domain.repository.BookingRe
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
 
-import java.util.EnumSet;
-import java.util.Optional;
-import java.util.UUID;
+import java.time.Instant;
+import java.util.*;
 
 @Repository
 @RequiredArgsConstructor
@@ -26,6 +25,22 @@ public class JpaBookingRepositoryAdapter implements BookingRepository {
         final EnumSet<BookingStatus> statuses = EnumSet.of(BookingStatus.CONFIRMED, BookingStatus.USED);
 
         return bookingRepository.existsOverlappingBooking(spotId, timeRange.start(), timeRange.end(), statuses);
+    }
+
+    @Override
+    public List<Booking> findCurrentAndFutureByResidentId (UUID residentId, Instant now) {
+        List<BookingJpaEntity> bookingJpaEntities = bookingRepository.findCurrentAndFutureByResidentId(
+                residentId,
+                now,
+                EnumSet.of(BookingStatus.CONFIRMED, BookingStatus.USED)
+        );
+
+        List<Booking> bookings = new ArrayList<>();
+        for (BookingJpaEntity jpaEntity : bookingJpaEntities) {
+            bookings.add(jpaEntity.toDomain());
+        }
+
+        return bookings;
     }
 
     @Override
