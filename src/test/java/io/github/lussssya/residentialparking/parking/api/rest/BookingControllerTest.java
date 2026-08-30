@@ -1,9 +1,11 @@
 package io.github.lussssya.residentialparking.parking.api.rest;
 
 import io.github.lussssya.residentialparking.parking.application.BookingService;
+import io.github.lussssya.residentialparking.parking.application.ResidentBookings;
 import io.github.lussssya.residentialparking.parking.domain.model.Booking;
 import io.github.lussssya.residentialparking.parking.domain.model.TimeRange;
 import org.junit.jupiter.api.Test;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.http.MediaType;
@@ -12,11 +14,13 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -93,5 +97,67 @@ class BookingControllerTest {
                 .andExpect(status().isBadRequest());
 
         verifyNoInteractions(bookingService);
+    }
+
+    @Test
+    void returnsCurrentAndFutureBookingsInSeparateGroups () throws Exception {
+        Instant now = Instant.parse("2026-08-30T11:00:00Z");
+        Booking currentBooking = new Booking(
+                BOOKING_ID,
+                COMMUNITY_ID,
+                SPOT_ID,
+                RESIDENT_ID,
+                VEHICLE_ID,
+                new TimeRange(Instant.parse("2026-08-30T10:00:00Z"), Instant.parse("2026-08-30T12:00:00Z"))
+        );
+        Booking futureBooking = new Booking(
+                UUID.fromString("60000000-0000-0000-0000-000000000006"),
+                COMMUNITY_ID,
+                SPOT_ID,
+                RESIDENT_ID,
+                VEHICLE_ID,
+                new TimeRange(Instant.parse("2026-08-30T13:00:00Z"), Instant.parse("2026-08-30T14:00:00Z"))
+        );
+
+        when(clock.instant()).thenReturn(now);
+        when(bookingService.findCurrentAndFutureBookings(RESIDENT_ID, now))
+                .thenReturn(new ResidentBookings(List.of(currentBooking), List.of(futureBooking)));
+
+        mockMvc.perform(get("/api/residents/{residentId}/bookings", RESIDENT_ID))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.current[0].id").value(BOOKING_ID.toString()))
+                .andExpect(jsonPath("$.current[0].status").value("CONFIRMED"))
+                .andExpect(jsonPath("$.future[0].id").value(futureBooking.getId().toString()))
+                .andExpect(jsonPath("$.future[0].status").value("CONFIRMED"));
+
+        verify(bookingService).findCurrentAndFutureBookings(RESIDENT_ID, now);
+    }
+
+    @Test
+    void returnsConflictForDataIntegrityViolation () throws Exception {
+        when(bookingService.createBooking(COMMUNITY_ID, SPOT_ID, RESIDENT_ID, VEHICLE_ID, TIME_RANGE))
+                .thenThrow(new DataIntegrityViolationException("duplicate booking"));
+
+        String requestJson = """
+                {
+                  "communityId": "%s",
+                  "spotId": "%s",
+                  "residentId": "%s",
+                  "vehicleId": "%s",
+                  "start": "%s",
+                  "end": "%s"
+                }
+                """.formatted(COMMUNITY_ID, SPOT_ID, RESIDENT_ID, VEHICLE_ID, START, END);
+
+        mockMvc.perform(post("/api/bookings")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestJson))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.status").value(409))
+                .andExpect(jsonPath("$.error").value("Conflict"))
+                .andExpect(jsonPath("$.message").value(
+                        "The request conflicts with existing data or a concurrent change."
+                ))
+                .andExpect(jsonPath("$.path").value("/api/bookings"));
     }
 }

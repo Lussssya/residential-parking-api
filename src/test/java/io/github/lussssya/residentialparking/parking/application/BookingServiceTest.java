@@ -15,6 +15,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.UUID;
@@ -160,6 +161,61 @@ class BookingServiceTest {
         );
 
         verifyNoInteractions(parkingSpotRepository, parkingAvailabilityService, bookingRepository);
+    }
+
+    @Test
+    void separatesCurrentAndFutureBookings () {
+        Instant now = Instant.parse("2026-08-30T11:00:00Z");
+
+        Booking currentBooking = new Booking(
+                UUID.fromString("50000000-0000-0000-0000-000000000005"),
+                COMMUNITY_ID,
+                SPOT_ID,
+                RESIDENT_ID,
+                VEHICLE_ID,
+                new TimeRange(Instant.parse("2026-08-30T10:00:00Z"), Instant.parse("2026-08-30T12:00:00Z"))
+        );
+
+        Booking futureBooking = new Booking(
+                UUID.fromString("60000000-0000-0000-0000-000000000006"),
+                COMMUNITY_ID,
+                SPOT_ID,
+                RESIDENT_ID,
+                VEHICLE_ID,
+                new TimeRange(Instant.parse("2026-08-30T13:00:00Z"), Instant.parse("2026-08-30T14:00:00Z"))
+        );
+
+        when(bookingRepository.findCurrentAndFutureByResidentId(RESIDENT_ID, now))
+                .thenReturn(List.of(currentBooking, futureBooking));
+
+        ResidentBookings result = bookingService.findCurrentAndFutureBookings(RESIDENT_ID, now);
+
+        assertAll(
+                () -> assertEquals(List.of(currentBooking), result.current()),
+                () -> assertEquals(List.of(futureBooking), result.future())
+        );
+
+        verify(bookingRepository).findCurrentAndFutureByResidentId(RESIDENT_ID, now);
+
+        verifyNoInteractions(parkingSpotRepository, parkingAvailabilityService);
+    }
+
+    @Test
+    void rejectsNullInputsWhenFindingResidentBookings () {
+        Instant now = Instant.parse("2026-08-30T11:00:00Z");
+
+        assertAll(
+                () -> assertThrows(
+                        NullPointerException.class,
+                        () -> bookingService.findCurrentAndFutureBookings(null, now)
+                ),
+                () -> assertThrows(
+                        NullPointerException.class,
+                        () -> bookingService.findCurrentAndFutureBookings(RESIDENT_ID, null)
+                )
+        );
+
+        verifyNoInteractions(bookingRepository, parkingSpotRepository, parkingAvailabilityService);
     }
 
     private ParkingSpot newParkingSpot (UUID communityId) {
