@@ -15,6 +15,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.UUID;
 
 import static org.mockito.Mockito.verify;
@@ -159,5 +160,65 @@ class BookingControllerTest {
                         "The request conflicts with existing data or a concurrent change."
                 ))
                 .andExpect(jsonPath("$.path").value("/api/bookings"));
+    }
+
+    @Test
+    void cancelsBookingUsingClockTime () throws Exception {
+        Instant now = Instant.parse("2026-08-30T10:00:00Z");
+        Booking booking = new Booking(BOOKING_ID, COMMUNITY_ID, SPOT_ID, RESIDENT_ID, VEHICLE_ID, TIME_RANGE);
+        booking.cancel(now);
+
+        when(clock.instant()).thenReturn(now);
+        when(bookingService.cancelBooking(BOOKING_ID, now)).thenReturn(booking);
+
+        mockMvc.perform(post("/api/bookings/{bookingId}/cancel", BOOKING_ID))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(BOOKING_ID.toString()))
+                .andExpect(jsonPath("$.communityId").value(COMMUNITY_ID.toString()))
+                .andExpect(jsonPath("$.spotId").value(SPOT_ID.toString()))
+                .andExpect(jsonPath("$.residentId").value(RESIDENT_ID.toString()))
+                .andExpect(jsonPath("$.vehicleId").value(VEHICLE_ID.toString()))
+                .andExpect(jsonPath("$.start").value(START.toString()))
+                .andExpect(jsonPath("$.end").value(END.toString()))
+                .andExpect(jsonPath("$.checkInDeadline").value("2026-08-30T10:15:00Z"))
+                .andExpect(jsonPath("$.status").value("CANCELLED"));
+
+        verify(bookingService).cancelBooking(BOOKING_ID, now);
+    }
+
+    @Test
+    void returnsNotFoundForUnknownBookingCancellation () throws Exception {
+        Instant now = Instant.parse("2026-08-30T10:00:00Z");
+
+        when(clock.instant()).thenReturn(now);
+        when(bookingService.cancelBooking(BOOKING_ID, now))
+                .thenThrow(new NoSuchElementException("Booking was not found."));
+
+        mockMvc.perform(post("/api/bookings/{bookingId}/cancel", BOOKING_ID))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.status").value(404))
+                .andExpect(jsonPath("$.error").value("Not Found"))
+                .andExpect(jsonPath("$.message").value("Booking was not found."))
+                .andExpect(jsonPath("$.path").value("/api/bookings/" + BOOKING_ID + "/cancel"));
+    }
+
+    @Test
+    void returnsConflictWhenBookingCancellationIsNotAllowed () throws Exception {
+        Instant now = Instant.parse("2026-08-30T10:15:00Z");
+
+        when(clock.instant()).thenReturn(now);
+        when(bookingService.cancelBooking(BOOKING_ID, now))
+                .thenThrow(new IllegalStateException(
+                        "A booking can only be cancelled before its check-in deadline."
+                ));
+
+        mockMvc.perform(post("/api/bookings/{bookingId}/cancel", BOOKING_ID))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.status").value(409))
+                .andExpect(jsonPath("$.error").value("Conflict"))
+                .andExpect(jsonPath("$.message").value(
+                        "A booking can only be cancelled before its check-in deadline."
+                ))
+                .andExpect(jsonPath("$.path").value("/api/bookings/" + BOOKING_ID + "/cancel"));
     }
 }

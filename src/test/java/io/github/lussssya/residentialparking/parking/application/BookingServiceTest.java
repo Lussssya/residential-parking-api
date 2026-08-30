@@ -26,11 +26,13 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class BookingServiceTest {
+    private static final UUID BOOKING_ID = UUID.fromString("50000000-0000-0000-0000-000000000005");
     private static final UUID COMMUNITY_ID = UUID.fromString("10000000-0000-0000-0000-000000000001");
     private static final UUID OTHER_COMMUNITY_ID = UUID.fromString("10000000-0000-0000-0000-000000000002");
     private static final UUID SPOT_ID = UUID.fromString("20000000-0000-0000-0000-000000000002");
@@ -218,7 +220,79 @@ class BookingServiceTest {
         verifyNoInteractions(bookingRepository, parkingSpotRepository, parkingAvailabilityService);
     }
 
+    @Test
+    void cancelsConfirmedBookingAndSavesIt () {
+        Booking booking = newBooking();
+        Instant now = Instant.parse("2026-08-30T10:00:00Z");
+
+        when(bookingRepository.findById(BOOKING_ID)).thenReturn(Optional.of(booking));
+
+        Booking result = bookingService.cancelBooking(BOOKING_ID, now);
+
+        assertAll(
+                () -> assertSame(booking, result),
+                () -> assertEquals(BookingStatus.CANCELLED, result.getStatus())
+        );
+        verify(bookingRepository).save(booking);
+    }
+
+    @Test
+    void rejectsUnknownBookingWithoutSaving () {
+        Instant now = Instant.parse("2026-08-30T10:00:00Z");
+
+        when(bookingRepository.findById(BOOKING_ID)).thenReturn(Optional.empty());
+
+        assertThrows(
+                NoSuchElementException.class,
+                () -> bookingService.cancelBooking(BOOKING_ID, now)
+        );
+
+        verify(bookingRepository).findById(BOOKING_ID);
+        verifyNoMoreInteractions(bookingRepository);
+        verifyNoInteractions(parkingSpotRepository, parkingAvailabilityService);
+    }
+
+    @Test
+    void propagatesCancellationFailureWithoutSaving () {
+        Booking booking = newBooking();
+        Instant checkInDeadline = Instant.parse("2026-08-30T10:15:00Z");
+
+        when(bookingRepository.findById(BOOKING_ID)).thenReturn(Optional.of(booking));
+
+        assertThrows(
+                IllegalStateException.class,
+                () -> bookingService.cancelBooking(BOOKING_ID, checkInDeadline)
+        );
+
+        assertEquals(BookingStatus.CONFIRMED, booking.getStatus());
+        verify(bookingRepository).findById(BOOKING_ID);
+        verifyNoMoreInteractions(bookingRepository);
+        verifyNoInteractions(parkingSpotRepository, parkingAvailabilityService);
+    }
+
+    @Test
+    void rejectsNullInputsWhenCancellingBookingBeforeUsingRepositories () {
+        Instant now = Instant.parse("2026-08-30T10:00:00Z");
+
+        assertAll(
+                () -> assertThrows(
+                        NullPointerException.class,
+                        () -> bookingService.cancelBooking(null, now)
+                ),
+                () -> assertThrows(
+                        NullPointerException.class,
+                        () -> bookingService.cancelBooking(BOOKING_ID, null)
+                )
+        );
+
+        verifyNoInteractions(bookingRepository, parkingSpotRepository, parkingAvailabilityService);
+    }
+
     private ParkingSpot newParkingSpot (UUID communityId) {
         return new ParkingSpot(SPOT_ID, communityId, "A-12");
+    }
+
+    private Booking newBooking () {
+        return new Booking(BOOKING_ID, COMMUNITY_ID, SPOT_ID, RESIDENT_ID, VEHICLE_ID, TIME_RANGE);
     }
 }
