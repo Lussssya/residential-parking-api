@@ -103,7 +103,15 @@ class ParkingSessionControllerTest {
                         "/api/bookings/{bookingId}/parking-session",
                         "not-a-uuid"
                 ))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.error").value("Bad Request"))
+                .andExpect(jsonPath("$.message").value(
+                        "Invalid value for 'bookingId'."
+                ))
+                .andExpect(jsonPath("$.path").value(
+                        "/api/bookings/not-a-uuid/parking-session"
+                ));
 
         verifyNoInteractions(parkingSessionService);
     }
