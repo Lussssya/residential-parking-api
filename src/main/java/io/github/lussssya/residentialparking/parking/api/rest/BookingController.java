@@ -42,4 +42,11 @@ public class BookingController {
                 )
         );
     }
+
+    @PostMapping("/bookings/{bookingId}/cancel")
+    public BookingResponse cancelBooking (@PathVariable UUID bookingId) {
+        Booking booking = bookingService.cancelBooking(bookingId, Instant.now(clock));
+
+        return BookingResponse.from(booking);
+    }
 }

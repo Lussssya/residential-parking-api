@@ -28,7 +28,9 @@ public class BookingService {
         Objects.requireNonNull(vehicleId, "Vehicle ID should not be null.");
         Objects.requireNonNull(timeRange, "Time range should not be null.");
 
-        final ParkingSpot parkingSpot = parkingSpotRepository.findById(spotId).orElseThrow(() -> new NoSuchElementException("Parking spot was not found."));
+        final ParkingSpot parkingSpot = parkingSpotRepository.findById(spotId).orElseThrow(
+                () -> new NoSuchElementException("Parking spot was not found.")
+        );
 
         if (!parkingSpot.getCommunityId().equals(communityId)) {
             throw new NoSuchElementException("Parking spot was not found in the community.");
@@ -61,5 +63,19 @@ public class BookingService {
         }
 
         return new ResidentBookings(currentBookings, futureBookings);
+    }
+
+    @Transactional
+    public Booking cancelBooking (UUID bookingId, Instant now) {
+        Objects.requireNonNull(bookingId, "Booking ID should not be null.");
+        Objects.requireNonNull(now, "Current time should not be null.");
+
+        Booking booking = bookingRepository.findById(bookingId).orElseThrow(
+                () -> new NoSuchElementException("Booking was not found.")
+        );
+
+        booking.cancel(now);
+        bookingRepository.save(booking);
+        return booking;
     }
 }
