@@ -26,7 +26,7 @@ public class ParkingSpot {
         }
         this.code = code.strip();
 
-        this.status = Objects.requireNonNull(status, "Status should not be null.");;
+        this.status = Objects.requireNonNull(status, "Status should not be null.");
     }
 
     public void activate () {
