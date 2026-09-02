@@ -46,7 +46,7 @@ public class Booking {
         status = BookingStatus.CANCELLED;
     }
 
-    public void markUsed (Instant now) {
+    public void activate (Instant now) {
         ensureConfirmed();
         Objects.requireNonNull(now, "Current time should not be null.");
 
@@ -55,7 +55,7 @@ public class Booking {
             throw new IllegalStateException("A booking can only be used during its arrival window.");
         }
 
-        status = BookingStatus.USED;
+        status = BookingStatus.ACTIVATED;
     }
 
     public void expire (Instant now) {
@@ -68,6 +68,14 @@ public class Booking {
         }
 
         status = BookingStatus.EXPIRED;
+    }
+
+    public void complete () {
+        if (status != BookingStatus.ACTIVATED) {
+            throw new IllegalStateException("Only an activated booking can be completed.");
+        }
+
+        status = BookingStatus.COMPLETED;
     }
 
     public Instant getCheckInDeadline () {

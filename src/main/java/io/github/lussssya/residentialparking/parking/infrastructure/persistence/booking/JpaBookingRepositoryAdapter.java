@@ -22,7 +22,7 @@ public class JpaBookingRepositoryAdapter implements BookingRepository {
 
     @Override
     public boolean existsOverlappingBooking (UUID spotId, TimeRange timeRange) {
-        final EnumSet<BookingStatus> statuses = EnumSet.of(BookingStatus.CONFIRMED, BookingStatus.USED);
+        final EnumSet<BookingStatus> statuses = EnumSet.of(BookingStatus.CONFIRMED, BookingStatus.ACTIVATED);
 
         return bookingRepository.existsOverlappingBooking(spotId, timeRange.start(), timeRange.end(), statuses);
     }
@@ -32,7 +32,7 @@ public class JpaBookingRepositoryAdapter implements BookingRepository {
         List<BookingJpaEntity> bookingJpaEntities = bookingRepository.findCurrentAndFutureByResidentId(
                 residentId,
                 now,
-                EnumSet.of(BookingStatus.CONFIRMED, BookingStatus.USED)
+                EnumSet.of(BookingStatus.CONFIRMED, BookingStatus.ACTIVATED)
         );
 
         List<Booking> bookings = new ArrayList<>();

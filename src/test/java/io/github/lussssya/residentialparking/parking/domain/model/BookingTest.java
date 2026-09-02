@@ -110,7 +110,7 @@ class BookingTest {
     @Test
     void marksBookingUsedAtStart () {
         Booking booking = newBooking();
-        booking.markUsed(START);
+        booking.activate(START);
 
         assertEquals(BookingStatus.USED, booking.getStatus());
     }
@@ -118,7 +118,7 @@ class BookingTest {
     @Test
     void marksBookingUsedDuringGracePeriod () {
         Booking booking = newBooking();
-        booking.markUsed(DURING_GRACE_PERIOD);
+        booking.activate(DURING_GRACE_PERIOD);
 
         assertEquals(BookingStatus.USED, booking.getStatus());
     }
@@ -127,7 +127,7 @@ class BookingTest {
     void rejectsUseBeforeBookingStart () {
         Booking booking = newBooking();
 
-        assertThrows(IllegalStateException.class, () -> booking.markUsed(START.minusNanos(1)));
+        assertThrows(IllegalStateException.class, () -> booking.activate(START.minusNanos(1)));
         assertConfirmed(booking);
     }
 
@@ -135,7 +135,7 @@ class BookingTest {
     void rejectsUseAtCheckInDeadline () {
         Booking booking = newBooking();
 
-        assertThrows(IllegalStateException.class, () -> booking.markUsed(CHECK_IN_DEADLINE));
+        assertThrows(IllegalStateException.class, () -> booking.activate(CHECK_IN_DEADLINE));
         assertConfirmed(booking);
     }
 
@@ -176,7 +176,7 @@ class BookingTest {
                 ),
                 () -> assertThrows(
                         NullPointerException.class,
-                        () -> usage.markUsed(null)
+                        () -> usage.activate(null)
                 ),
                 () -> assertThrows(
                         NullPointerException.class,
@@ -203,7 +203,7 @@ class BookingTest {
     @Test
     void rejectsTransitionsAfterBeingUsed () {
         Booking booking = newBooking();
-        booking.markUsed(DURING_GRACE_PERIOD);
+        booking.activate(DURING_GRACE_PERIOD);
 
         assertAllTransitionsRejected(booking);
         assertEquals(BookingStatus.USED, booking.getStatus());
@@ -234,7 +234,7 @@ class BookingTest {
                 ),
                 () -> assertThrows(
                         IllegalStateException.class,
-                        () -> booking.markUsed(DURING_GRACE_PERIOD)
+                        () -> booking.activate(DURING_GRACE_PERIOD)
                 ),
                 () -> assertThrows(
                         IllegalStateException.class,

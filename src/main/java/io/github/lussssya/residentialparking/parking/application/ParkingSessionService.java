@@ -1,9 +1,6 @@
 package io.github.lussssya.residentialparking.parking.application;
 
-import io.github.lussssya.residentialparking.parking.domain.model.Booking;
-import io.github.lussssya.residentialparking.parking.domain.model.ParkingSession;
-import io.github.lussssya.residentialparking.parking.domain.model.ParkingSpot;
-import io.github.lussssya.residentialparking.parking.domain.model.ParkingSpotStatus;
+import io.github.lussssya.residentialparking.parking.domain.model.*;
 import io.github.lussssya.residentialparking.parking.domain.repository.BookingRepository;
 import io.github.lussssya.residentialparking.parking.domain.repository.ParkingSessionRepository;
 import io.github.lussssya.residentialparking.parking.domain.repository.ParkingSpotRepository;
@@ -47,7 +44,7 @@ public class ParkingSessionService {
             throw new IllegalStateException("Parking spot is currently occupied.");
         }
 
-        booking.markUsed(startedAt);
+        booking.activate(startedAt);
         bookingRepository.save(booking);
 
         ParkingSession parkingSession = new ParkingSession(
@@ -70,8 +67,17 @@ public class ParkingSessionService {
         ParkingSession parkingSession = parkingSessionRepository.findById(sessionId).orElseThrow(
                 () -> new NoSuchElementException("No parking session with such Id.")
         );
+
+        Booking booking = bookingRepository.findById(parkingSession.getBookingId()).orElseThrow(
+                () -> new NoSuchElementException("No booking with such Id.")
+        );
+
+        booking.complete();
+        bookingRepository.save(booking);
+
         parkingSession.finish(finishedAt);
         parkingSessionRepository.save(parkingSession);
+
         return parkingSession;
     }
 }
