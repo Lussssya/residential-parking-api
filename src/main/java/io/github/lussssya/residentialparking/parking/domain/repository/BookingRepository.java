@@ -15,5 +15,7 @@ public interface BookingRepository {
 
     List<Booking> findCurrentAndFutureByResidentId (UUID residentId, Instant now);
 
+    List<Booking> findAllConfirmedWithOverdueCheckin (Instant now);
+
     void save (Booking booking);
 }

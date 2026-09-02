@@ -44,6 +44,21 @@ public class JpaBookingRepositoryAdapter implements BookingRepository {
     }
 
     @Override
+    public List<Booking> findAllConfirmedWithOverdueCheckin (Instant now) {
+        List<BookingJpaEntity> bookingJpaEntities = bookingRepository.findAllConfirmedAndStarted(now, BookingStatus.CONFIRMED);
+
+        List<Booking> bookings = new ArrayList<>();
+        for (BookingJpaEntity jpaEntity : bookingJpaEntities) {
+            final Booking booking = jpaEntity.toDomain();
+            if (!booking.getCheckInDeadline().isAfter(now)) {
+                bookings.add(booking);
+            }
+        }
+
+        return bookings;
+    }
+
+    @Override
     public void save (Booking booking) {
         BookingJpaEntity bookingJpaEntity = BookingJpaEntity.fromDomain(booking);
 

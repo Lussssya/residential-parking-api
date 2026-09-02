@@ -31,4 +31,12 @@ public interface SpringDataBookingRepository extends JpaRepository<BookingJpaEnt
             ORDER BY booking.startTime ASC
             """)
     List<BookingJpaEntity> findCurrentAndFutureByResidentId (UUID residentId, Instant now, Collection<BookingStatus> statuses);
+
+    @Query("""
+            SELECT booking
+            FROM BookingJpaEntity booking
+            WHERE booking.startTime < :now
+              AND booking.status = :status
+            """)
+    List<BookingJpaEntity> findAllConfirmedAndStarted (Instant now, BookingStatus status);
 }
