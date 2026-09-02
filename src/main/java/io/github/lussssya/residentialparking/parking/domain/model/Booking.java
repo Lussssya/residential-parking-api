@@ -34,6 +34,13 @@ public class Booking {
         this.status = Objects.requireNonNull(status, "Status should not be null.");
     }
 
+    public static Booking create (UUID id, UUID communityId, UUID spotId, UUID residentId, UUID vehicleId, TimeRange timeRange, Instant now) {
+        if (timeRange.start().isBefore(now)) {
+            throw new IllegalStateException("Booking should not be in the past");
+        }
+        return new Booking(id, communityId, spotId, residentId, vehicleId, timeRange);
+    }
+
     public void cancel (Instant now) {
         ensureConfirmed();
         Objects.requireNonNull(now, "Current time should not be null.");
