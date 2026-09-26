@@ -7,6 +7,7 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class BookingTest {
@@ -19,6 +20,7 @@ class BookingTest {
     private static final Instant END = Instant.parse("2026-08-29T12:00:00Z");
     private static final Instant CHECK_IN_DEADLINE = Instant.parse("2026-08-29T10:15:00Z");
     private static final Instant DURING_GRACE_PERIOD = Instant.parse("2026-08-29T10:05:00Z");
+    private static final Instant COMPLETION_TIME = Instant.parse("2026-08-29T11:00:00Z");
     private static final TimeRange TIME_RANGE = new TimeRange(START, END);
 
     @Test
@@ -39,7 +41,9 @@ class BookingTest {
                 () -> assertEquals(
                         BookingStatus.CONFIRMED,
                         booking.getStatus()
-                )
+                ),
+                () -> assertNull(booking.getActualStartTime()),
+                () -> assertNull(booking.getActualFinishTime())
         );
     }
 
@@ -112,7 +116,11 @@ class BookingTest {
         Booking booking = newBooking();
         booking.activate(START);
 
-        assertEquals(BookingStatus.ACTIVATED, booking.getStatus());
+        assertAll(
+                () -> assertEquals(BookingStatus.ACTIVATED, booking.getStatus()),
+                () -> assertEquals(START, booking.getActualStartTime()),
+                () -> assertNull(booking.getActualFinishTime())
+        );
     }
 
     @Test
@@ -120,7 +128,11 @@ class BookingTest {
         Booking booking = newBooking();
         booking.activate(DURING_GRACE_PERIOD);
 
-        assertEquals(BookingStatus.ACTIVATED, booking.getStatus());
+        assertAll(
+                () -> assertEquals(BookingStatus.ACTIVATED, booking.getStatus()),
+                () -> assertEquals(DURING_GRACE_PERIOD, booking.getActualStartTime()),
+                () -> assertNull(booking.getActualFinishTime())
+        );
     }
 
     @Test
@@ -164,10 +176,56 @@ class BookingTest {
     }
 
     @Test
+    void completesActivatedBooking () {
+        Booking booking = newBooking();
+        booking.activate(DURING_GRACE_PERIOD);
+
+        booking.complete(COMPLETION_TIME);
+
+        assertAll(
+                () -> assertEquals(BookingStatus.COMPLETED, booking.getStatus()),
+                () -> assertEquals(DURING_GRACE_PERIOD, booking.getActualStartTime()),
+                () -> assertEquals(COMPLETION_TIME, booking.getActualFinishTime())
+        );
+    }
+
+    @Test
+    void rejectsCompletionBeforeActivation () {
+        Booking booking = newBooking();
+
+        assertThrows(IllegalStateException.class, () -> booking.complete(COMPLETION_TIME));
+        assertConfirmed(booking);
+    }
+
+    @Test
+    void rejectsCompletionNotAfterActivation () {
+        Booking booking = newBooking();
+        booking.activate(DURING_GRACE_PERIOD);
+
+        assertAll(
+                () -> assertThrows(
+                        IllegalArgumentException.class,
+                        () -> booking.complete(DURING_GRACE_PERIOD)
+                ),
+                () -> assertThrows(
+                        IllegalArgumentException.class,
+                        () -> booking.complete(DURING_GRACE_PERIOD.minusNanos(1))
+                )
+        );
+
+        assertAll(
+                () -> assertEquals(BookingStatus.ACTIVATED, booking.getStatus()),
+                () -> assertNull(booking.getActualFinishTime())
+        );
+    }
+
+    @Test
     void rejectsNullCurrentTimesWithoutChangingBookings () {
         Booking cancellation = newBooking();
         Booking usage = newBooking();
         Booking expiration = newBooking();
+        Booking completion = newBooking();
+        completion.activate(DURING_GRACE_PERIOD);
 
         assertAll(
                 () -> assertThrows(
@@ -181,13 +239,19 @@ class BookingTest {
                 () -> assertThrows(
                         NullPointerException.class,
                         () -> expiration.expire(null)
+                ),
+                () -> assertThrows(
+                        NullPointerException.class,
+                        () -> completion.complete(null)
                 )
         );
 
         assertAll(
                 () -> assertConfirmed(cancellation),
                 () -> assertConfirmed(usage),
-                () -> assertConfirmed(expiration)
+                () -> assertConfirmed(expiration),
+                () -> assertEquals(BookingStatus.ACTIVATED, completion.getStatus()),
+                () -> assertNull(completion.getActualFinishTime())
         );
     }
 
@@ -201,11 +265,24 @@ class BookingTest {
     }
 
     @Test
-    void rejectsTransitionsAfterBeingUsed () {
+    void rejectsInvalidTransitionsAfterActivation () {
         Booking booking = newBooking();
         booking.activate(DURING_GRACE_PERIOD);
 
-        assertAllTransitionsRejected(booking);
+        assertAll(
+                () -> assertThrows(
+                        IllegalStateException.class,
+                        () -> booking.cancel(DURING_GRACE_PERIOD)
+                ),
+                () -> assertThrows(
+                        IllegalStateException.class,
+                        () -> booking.activate(DURING_GRACE_PERIOD)
+                ),
+                () -> assertThrows(
+                        IllegalStateException.class,
+                        () -> booking.expire(CHECK_IN_DEADLINE)
+                )
+        );
         assertEquals(BookingStatus.ACTIVATED, booking.getStatus());
     }
 
@@ -218,8 +295,85 @@ class BookingTest {
         assertEquals(BookingStatus.EXPIRED, booking.getStatus());
     }
 
+    @Test
+    void rejectsTransitionsAfterCompletion () {
+        Booking booking = newBooking();
+        booking.activate(DURING_GRACE_PERIOD);
+        booking.complete(COMPLETION_TIME);
+
+        assertAllTransitionsRejected(booking);
+        assertEquals(BookingStatus.COMPLETED, booking.getStatus());
+    }
+
+    @Test
+    void restoresActivatedAndCompletedBookings () {
+        Booking activated = existingBooking(BookingStatus.ACTIVATED, DURING_GRACE_PERIOD, null);
+        Booking completed = existingBooking(
+                BookingStatus.COMPLETED,
+                DURING_GRACE_PERIOD,
+                COMPLETION_TIME
+        );
+
+        assertAll(
+                () -> assertEquals(BookingStatus.ACTIVATED, activated.getStatus()),
+                () -> assertEquals(DURING_GRACE_PERIOD, activated.getActualStartTime()),
+                () -> assertNull(activated.getActualFinishTime()),
+                () -> assertEquals(BookingStatus.COMPLETED, completed.getStatus()),
+                () -> assertEquals(DURING_GRACE_PERIOD, completed.getActualStartTime()),
+                () -> assertEquals(COMPLETION_TIME, completed.getActualFinishTime())
+        );
+    }
+
+    @Test
+    void rejectsInconsistentExistingLifecycleTimes () {
+        assertAll(
+                () -> assertThrows(
+                        NullPointerException.class,
+                        () -> existingBooking(BookingStatus.ACTIVATED, null, null)
+                ),
+                () -> assertThrows(
+                        IllegalArgumentException.class,
+                        () -> existingBooking(BookingStatus.ACTIVATED, DURING_GRACE_PERIOD, COMPLETION_TIME)
+                ),
+                () -> assertThrows(
+                        NullPointerException.class,
+                        () -> existingBooking(BookingStatus.COMPLETED, DURING_GRACE_PERIOD, null)
+                ),
+                () -> assertThrows(
+                        IllegalArgumentException.class,
+                        () -> existingBooking(
+                                BookingStatus.COMPLETED,
+                                DURING_GRACE_PERIOD,
+                                DURING_GRACE_PERIOD
+                        )
+                ),
+                () -> assertThrows(
+                        IllegalArgumentException.class,
+                        () -> existingBooking(BookingStatus.CONFIRMED, DURING_GRACE_PERIOD, null)
+                )
+        );
+    }
+
     private Booking newBooking () {
         return new Booking(BOOKING_ID, COMMUNITY_ID, SPOT_ID, RESIDENT_ID, VEHICLE_ID, TIME_RANGE);
+    }
+
+    private Booking existingBooking (
+            BookingStatus status,
+            Instant actualStartTime,
+            Instant actualFinishTime
+    ) {
+        return Booking.fromExistingState(
+                BOOKING_ID,
+                COMMUNITY_ID,
+                SPOT_ID,
+                RESIDENT_ID,
+                VEHICLE_ID,
+                TIME_RANGE,
+                status,
+                actualStartTime,
+                actualFinishTime
+        );
     }
 
     private void assertConfirmed (Booking booking) {
@@ -239,6 +393,10 @@ class BookingTest {
                 () -> assertThrows(
                         IllegalStateException.class,
                         () -> booking.expire(CHECK_IN_DEADLINE)
+                ),
+                () -> assertThrows(
+                        IllegalStateException.class,
+                        () -> booking.complete(COMPLETION_TIME)
                 )
         );
     }

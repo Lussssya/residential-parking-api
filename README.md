@@ -2,7 +2,7 @@
 
 A small Spring Boot service for managing guest parking in residential communities.
 
-Residents can check which parking spots are available for a time range, create a booking, start and release a parking session, and view their current and future bookings.
+Residents can check which parking spots are available for a time range, create, activate, finish, or cancel a booking, and view their current and future bookings.
 
 I also added booking cancellation as an extra resident use case. Communities, residents, vehicles, and parking spots are treated as pre-existing reference data for this task.
 
@@ -82,7 +82,7 @@ Example response:
 ]
 ```
 
-A spot is available when it is active and has no overlapping `CONFIRMED` or `USED` booking. An empty result is returned as `200 OK` with `[]`.
+A spot is available when it is active and has no overlapping `CONFIRMED` or `ACTIVATED` booking. An empty result is returned as `200 OK` with `[]`.
 
 ## Create a booking
 
@@ -114,7 +114,9 @@ Example response:
   "start": "2030-01-01T10:00:00Z",
   "end": "2030-01-01T12:00:00Z",
   "checkInDeadline": "2030-01-01T10:15:00Z",
-  "status": "CONFIRMED"
+  "status": "CONFIRMED",
+  "actualStartTime": null,
+  "actualFinishTime": null
 }
 ```
 
@@ -135,7 +137,7 @@ Example response (short version):
       "id": "50000000-0000-0000-0000-000000000005",
       "start": "2030-01-01T10:00:00Z",
       "end": "2030-01-01T12:00:00Z",
-      "status": "USED"
+      "status": "ACTIVATED"
     }
   ],
   "future": [
@@ -151,35 +153,39 @@ Example response (short version):
 
 Current bookings have already started but have not ended. Future bookings start after the current server time. Cancelled, expired, and already-ended bookings are excluded, and results are ordered by start time.
 
-## Start a parking session
+## Activate a booking
 
 ```http
-POST /api/bookings/{bookingId}/parking-session
+PUT /api/bookings/{bookingId}/activate
 ```
 
-The server generates the start time. A session can start from the booking's start time until its check-in deadline, which is at most 15 minutes after the start. When trying this manually, create the booking with a start time around the current UTC time.
+The server records the activation time. A booking can be activated from its scheduled start until its check-in deadline, which is at most 15 minutes after the start. When trying this manually, create the booking with a start time around the current UTC time.
 
 Example response:
 
 ```json
 {
-  "id": "70000000-0000-0000-0000-000000000007",
-  "bookingId": "50000000-0000-0000-0000-000000000005",
+  "id": "50000000-0000-0000-0000-000000000005",
+  "communityId": "10000000-0000-0000-0000-000000000001",
   "spotId": "40000000-0000-0000-0000-000000000004",
+  "residentId": "20000000-0000-0000-0000-000000000002",
   "vehicleId": "30000000-0000-0000-0000-000000000003",
-  "startedAt": "2030-01-01T10:05:00Z",
-  "finishedAt": null,
-  "status": "ACTIVE"
+  "start": "2030-01-01T10:00:00Z",
+  "end": "2030-01-01T12:00:00Z",
+  "checkInDeadline": "2030-01-01T10:15:00Z",
+  "status": "ACTIVATED",
+  "actualStartTime": "2030-01-01T10:05:00Z",
+  "actualFinishTime": null
 }
 ```
 
-## Release a parking session
+## Finish a booking
 
 ```http
-POST /api/parking-sessions/{sessionId}/release
+POST /api/bookings/{bookingId}/finish
 ```
 
-The server generates the finish time and changes the session status to `FINISHED`.
+The server records the finish time and changes an activated booking's status to `COMPLETED`.
 
 ## Cancel a booking
 
@@ -205,7 +211,7 @@ Domain and input failures use one response shape:
 The main mappings are:
 
 - `400 Bad Request` for invalid input, time ranges, and path values.
-- `404 Not Found` when a requested booking, parking spot, or parking session does not exist.
+- `404 Not Found` when a requested booking or parking spot does not exist.
 - `409 Conflict` for invalid state transitions, unavailable spots, and database conflicts caused by concurrent writes.
 
 Database exception details are not returned to the client.

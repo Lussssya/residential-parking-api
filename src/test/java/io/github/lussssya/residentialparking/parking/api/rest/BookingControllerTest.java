@@ -18,11 +18,13 @@ import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.UUID;
 
+import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -78,7 +80,9 @@ class BookingControllerTest {
                 .andExpect(jsonPath("$.start").value(START.toString()))
                 .andExpect(jsonPath("$.end").value(END.toString()))
                 .andExpect(jsonPath("$.checkInDeadline").value("2026-08-30T10:15:00Z"))
-                .andExpect(jsonPath("$.status").value("CONFIRMED"));
+                .andExpect(jsonPath("$.status").value("CONFIRMED"))
+                .andExpect(jsonPath("$.actualStartTime").value(nullValue()))
+                .andExpect(jsonPath("$.actualFinishTime").value(nullValue()));
 
         verify(bookingService).createBooking(COMMUNITY_ID, SPOT_ID, RESIDENT_ID, VEHICLE_ID, TIME_RANGE, NOW);
     }
@@ -138,6 +142,25 @@ class BookingControllerTest {
     }
 
     @Test
+    void activatesBookingUsingClockTime () throws Exception {
+        Instant activationTime = Instant.parse("2026-08-30T10:05:00Z");
+        Booking booking = new Booking(BOOKING_ID, COMMUNITY_ID, SPOT_ID, RESIDENT_ID, VEHICLE_ID, TIME_RANGE);
+        booking.activate(activationTime);
+
+        when(clock.instant()).thenReturn(activationTime);
+        when(bookingService.activateBooking(BOOKING_ID, activationTime)).thenReturn(booking);
+
+        mockMvc.perform(put("/api/bookings/{bookingId}/activate", BOOKING_ID))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(BOOKING_ID.toString()))
+                .andExpect(jsonPath("$.status").value("ACTIVATED"))
+                .andExpect(jsonPath("$.actualStartTime").value(activationTime.toString()))
+                .andExpect(jsonPath("$.actualFinishTime").value(nullValue()));
+
+        verify(bookingService).activateBooking(BOOKING_ID, activationTime);
+    }
+
+    @Test
     void returnsConflictForDataIntegrityViolation () throws Exception {
         when(clock.instant()).thenReturn(NOW);
         when(bookingService.createBooking(COMMUNITY_ID, SPOT_ID, RESIDENT_ID, VEHICLE_ID, TIME_RANGE, NOW))
@@ -185,7 +208,9 @@ class BookingControllerTest {
                 .andExpect(jsonPath("$.start").value(START.toString()))
                 .andExpect(jsonPath("$.end").value(END.toString()))
                 .andExpect(jsonPath("$.checkInDeadline").value("2026-08-30T10:15:00Z"))
-                .andExpect(jsonPath("$.status").value("CANCELLED"));
+                .andExpect(jsonPath("$.status").value("CANCELLED"))
+                .andExpect(jsonPath("$.actualStartTime").value(nullValue()))
+                .andExpect(jsonPath("$.actualFinishTime").value(nullValue()));
 
         verify(bookingService).cancelBooking(BOOKING_ID, now);
     }
@@ -224,5 +249,26 @@ class BookingControllerTest {
                         "A booking can only be cancelled before its check-in deadline."
                 ))
                 .andExpect(jsonPath("$.path").value("/api/bookings/" + BOOKING_ID + "/cancel"));
+    }
+
+    @Test
+    void finishesBookingUsingClockTime () throws Exception {
+        Instant activationTime = Instant.parse("2026-08-30T10:05:00Z");
+        Instant completionTime = Instant.parse("2026-08-30T11:00:00Z");
+        Booking booking = new Booking(BOOKING_ID, COMMUNITY_ID, SPOT_ID, RESIDENT_ID, VEHICLE_ID, TIME_RANGE);
+        booking.activate(activationTime);
+        booking.complete(completionTime);
+
+        when(clock.instant()).thenReturn(completionTime);
+        when(bookingService.finishBooking(BOOKING_ID, completionTime)).thenReturn(booking);
+
+        mockMvc.perform(post("/api/bookings/{bookingId}/finish", BOOKING_ID))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(BOOKING_ID.toString()))
+                .andExpect(jsonPath("$.status").value("COMPLETED"))
+                .andExpect(jsonPath("$.actualStartTime").value(activationTime.toString()))
+                .andExpect(jsonPath("$.actualFinishTime").value(completionTime.toString()));
+
+        verify(bookingService).finishBooking(BOOKING_ID, completionTime);
     }
 }

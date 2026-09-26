@@ -23,6 +23,7 @@ import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.verify;
@@ -43,6 +44,8 @@ class BookingServiceTest {
             Instant.parse("2026-08-30T12:00:00Z")
     );
     private static final Instant NOW = Instant.parse("2026-08-30T09:00:00Z");
+    private static final Instant ACTIVATION_TIME = Instant.parse("2026-08-30T10:05:00Z");
+    private static final Instant COMPLETION_TIME = Instant.parse("2026-08-30T11:00:00Z");
 
     @Mock
     private ParkingSpotRepository parkingSpotRepository;
@@ -219,6 +222,134 @@ class BookingServiceTest {
     }
 
     @Test
+    void activatesAndSavesBooking () {
+        Booking booking = newBooking();
+        ParkingSpot parkingSpot = newParkingSpot(COMMUNITY_ID);
+
+        when(bookingRepository.findById(BOOKING_ID)).thenReturn(Optional.of(booking));
+        when(parkingSpotRepository.findById(SPOT_ID)).thenReturn(Optional.of(parkingSpot));
+        when(bookingRepository.existsActivatedBySpotId(SPOT_ID)).thenReturn(false);
+
+        Booking result = bookingService.activateBooking(BOOKING_ID, ACTIVATION_TIME);
+
+        assertAll(
+                () -> assertSame(booking, result),
+                () -> assertEquals(BookingStatus.ACTIVATED, result.getStatus()),
+                () -> assertEquals(ACTIVATION_TIME, result.getActualStartTime()),
+                () -> assertNull(result.getActualFinishTime())
+        );
+        verify(bookingRepository).save(booking);
+    }
+
+    @Test
+    void rejectsActivationForUnknownBooking () {
+        when(bookingRepository.findById(BOOKING_ID)).thenReturn(Optional.empty());
+
+        assertThrows(
+                NoSuchElementException.class,
+                () -> bookingService.activateBooking(BOOKING_ID, ACTIVATION_TIME)
+        );
+
+        verify(bookingRepository).findById(BOOKING_ID);
+        verifyNoInteractions(parkingSpotRepository, parkingAvailabilityService);
+        verifyNoMoreInteractions(bookingRepository);
+    }
+
+    @Test
+    void rejectsActivationForMissingParkingSpot () {
+        Booking booking = newBooking();
+
+        when(bookingRepository.findById(BOOKING_ID)).thenReturn(Optional.of(booking));
+        when(parkingSpotRepository.findById(SPOT_ID)).thenReturn(Optional.empty());
+
+        assertThrows(
+                NoSuchElementException.class,
+                () -> bookingService.activateBooking(BOOKING_ID, ACTIVATION_TIME)
+        );
+
+        assertEquals(BookingStatus.CONFIRMED, booking.getStatus());
+        verify(bookingRepository).findById(BOOKING_ID);
+        verifyNoMoreInteractions(bookingRepository);
+        verifyNoInteractions(parkingAvailabilityService);
+    }
+
+    @Test
+    void rejectsActivationForInoperativeParkingSpot () {
+        Booking booking = newBooking();
+        ParkingSpot parkingSpot = newParkingSpot(COMMUNITY_ID);
+        parkingSpot.markInoperative();
+
+        when(bookingRepository.findById(BOOKING_ID)).thenReturn(Optional.of(booking));
+        when(parkingSpotRepository.findById(SPOT_ID)).thenReturn(Optional.of(parkingSpot));
+
+        assertThrows(
+                IllegalStateException.class,
+                () -> bookingService.activateBooking(BOOKING_ID, ACTIVATION_TIME)
+        );
+
+        assertEquals(BookingStatus.CONFIRMED, booking.getStatus());
+        verify(bookingRepository).findById(BOOKING_ID);
+        verifyNoMoreInteractions(bookingRepository);
+        verifyNoInteractions(parkingAvailabilityService);
+    }
+
+    @Test
+    void rejectsActivationWhenParkingSpotIsOccupied () {
+        Booking booking = newBooking();
+        ParkingSpot parkingSpot = newParkingSpot(COMMUNITY_ID);
+
+        when(bookingRepository.findById(BOOKING_ID)).thenReturn(Optional.of(booking));
+        when(parkingSpotRepository.findById(SPOT_ID)).thenReturn(Optional.of(parkingSpot));
+        when(bookingRepository.existsActivatedBySpotId(SPOT_ID)).thenReturn(true);
+
+        assertThrows(
+                IllegalStateException.class,
+                () -> bookingService.activateBooking(BOOKING_ID, ACTIVATION_TIME)
+        );
+
+        assertEquals(BookingStatus.CONFIRMED, booking.getStatus());
+        verifyNoInteractions(parkingAvailabilityService);
+    }
+
+    @Test
+    void propagatesActivationFailureWithoutSaving () {
+        Booking booking = newBooking();
+        ParkingSpot parkingSpot = newParkingSpot(COMMUNITY_ID);
+        Instant beforeStart = TIME_RANGE.start().minusNanos(1);
+
+        when(bookingRepository.findById(BOOKING_ID)).thenReturn(Optional.of(booking));
+        when(parkingSpotRepository.findById(SPOT_ID)).thenReturn(Optional.of(parkingSpot));
+        when(bookingRepository.existsActivatedBySpotId(SPOT_ID)).thenReturn(false);
+
+        assertThrows(
+                IllegalStateException.class,
+                () -> bookingService.activateBooking(BOOKING_ID, beforeStart)
+        );
+
+        assertEquals(BookingStatus.CONFIRMED, booking.getStatus());
+        verify(bookingRepository).findById(BOOKING_ID);
+        verify(bookingRepository).existsActivatedBySpotId(SPOT_ID);
+        verifyNoMoreInteractions(bookingRepository);
+        verifyNoInteractions(parkingAvailabilityService);
+    }
+
+    @Test
+    void rejectsNullActivationInputsBeforeUsingRepositories () {
+        assertAll(
+                () -> assertThrows(
+                        NullPointerException.class,
+                        () -> bookingService.activateBooking(null, ACTIVATION_TIME)
+                ),
+                () -> assertThrows(
+                        NullPointerException.class,
+                        () -> bookingService.activateBooking(BOOKING_ID, null)
+                )
+        );
+
+        verifyNoInteractions(bookingRepository, parkingSpotRepository, parkingAvailabilityService);
+    }
+
+    @Test
     void separatesCurrentAndFutureBookings () {
         Instant now = Instant.parse("2026-08-30T11:00:00Z");
 
@@ -335,6 +466,106 @@ class BookingServiceTest {
                 () -> assertThrows(
                         NullPointerException.class,
                         () -> bookingService.cancelBooking(BOOKING_ID, null)
+                )
+        );
+
+        verifyNoInteractions(bookingRepository, parkingSpotRepository, parkingAvailabilityService);
+    }
+
+    @Test
+    void expiresAndSavesOverdueBookings () {
+        Booking first = newBooking();
+        Booking second = new Booking(
+                UUID.fromString("60000000-0000-0000-0000-000000000006"),
+                COMMUNITY_ID,
+                SPOT_ID,
+                RESIDENT_ID,
+                VEHICLE_ID,
+                TIME_RANGE
+        );
+        Instant checkInDeadline = Instant.parse("2026-08-30T10:15:00Z");
+
+        when(bookingRepository.findAllConfirmedWithOverdueCheckin(checkInDeadline))
+                .thenReturn(List.of(first, second));
+
+        bookingService.expireOverdueBookings(checkInDeadline);
+
+        assertAll(
+                () -> assertEquals(BookingStatus.EXPIRED, first.getStatus()),
+                () -> assertEquals(BookingStatus.EXPIRED, second.getStatus())
+        );
+        verify(bookingRepository).save(first);
+        verify(bookingRepository).save(second);
+        verifyNoInteractions(parkingSpotRepository, parkingAvailabilityService);
+    }
+
+    @Test
+    void rejectsNullExpirationTimeBeforeUsingRepositories () {
+        assertThrows(NullPointerException.class, () -> bookingService.expireOverdueBookings(null));
+
+        verifyNoInteractions(bookingRepository, parkingSpotRepository, parkingAvailabilityService);
+    }
+
+    @Test
+    void finishesAndSavesActivatedBooking () {
+        Booking booking = newBooking();
+        booking.activate(ACTIVATION_TIME);
+
+        when(bookingRepository.findById(BOOKING_ID)).thenReturn(Optional.of(booking));
+
+        Booking result = bookingService.finishBooking(BOOKING_ID, COMPLETION_TIME);
+
+        assertAll(
+                () -> assertSame(booking, result),
+                () -> assertEquals(BookingStatus.COMPLETED, result.getStatus()),
+                () -> assertEquals(ACTIVATION_TIME, result.getActualStartTime()),
+                () -> assertEquals(COMPLETION_TIME, result.getActualFinishTime())
+        );
+        verify(bookingRepository).save(booking);
+        verifyNoInteractions(parkingSpotRepository, parkingAvailabilityService);
+    }
+
+    @Test
+    void rejectsFinishingUnknownBooking () {
+        when(bookingRepository.findById(BOOKING_ID)).thenReturn(Optional.empty());
+
+        assertThrows(
+                NoSuchElementException.class,
+                () -> bookingService.finishBooking(BOOKING_ID, COMPLETION_TIME)
+        );
+
+        verify(bookingRepository).findById(BOOKING_ID);
+        verifyNoMoreInteractions(bookingRepository);
+        verifyNoInteractions(parkingSpotRepository, parkingAvailabilityService);
+    }
+
+    @Test
+    void propagatesCompletionFailureWithoutSaving () {
+        Booking booking = newBooking();
+
+        when(bookingRepository.findById(BOOKING_ID)).thenReturn(Optional.of(booking));
+
+        assertThrows(
+                IllegalStateException.class,
+                () -> bookingService.finishBooking(BOOKING_ID, COMPLETION_TIME)
+        );
+
+        assertEquals(BookingStatus.CONFIRMED, booking.getStatus());
+        verify(bookingRepository).findById(BOOKING_ID);
+        verifyNoMoreInteractions(bookingRepository);
+        verifyNoInteractions(parkingSpotRepository, parkingAvailabilityService);
+    }
+
+    @Test
+    void rejectsNullCompletionInputsBeforeUsingRepositories () {
+        assertAll(
+                () -> assertThrows(
+                        NullPointerException.class,
+                        () -> bookingService.finishBooking(null, COMPLETION_TIME)
+                ),
+                () -> assertThrows(
+                        NullPointerException.class,
+                        () -> bookingService.finishBooking(BOOKING_ID, null)
                 )
         );
 
