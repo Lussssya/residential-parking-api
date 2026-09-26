@@ -35,6 +35,7 @@ class BookingControllerTest {
     private static final UUID VEHICLE_ID = UUID.fromString("50000000-0000-0000-0000-000000000005");
     private static final Instant START = Instant.parse("2026-08-30T10:00:00Z");
     private static final Instant END = Instant.parse("2026-08-30T12:00:00Z");
+    private static final Instant NOW = Instant.parse("2026-08-30T09:00:00Z");
     private static final TimeRange TIME_RANGE = new TimeRange(START, END);
 
     @Autowired
@@ -50,7 +51,9 @@ class BookingControllerTest {
     void createsBooking () throws Exception {
         Booking booking = new Booking(BOOKING_ID, COMMUNITY_ID, SPOT_ID, RESIDENT_ID, VEHICLE_ID, TIME_RANGE);
 
-        when(bookingService.createBooking(COMMUNITY_ID, SPOT_ID, RESIDENT_ID, VEHICLE_ID, TIME_RANGE)).thenReturn(booking);
+        when(clock.instant()).thenReturn(NOW);
+        when(bookingService.createBooking(COMMUNITY_ID, SPOT_ID, RESIDENT_ID, VEHICLE_ID, TIME_RANGE, NOW))
+                .thenReturn(booking);
 
         String requestJson = """
                 {
@@ -77,7 +80,7 @@ class BookingControllerTest {
                 .andExpect(jsonPath("$.checkInDeadline").value("2026-08-30T10:15:00Z"))
                 .andExpect(jsonPath("$.status").value("CONFIRMED"));
 
-        verify(bookingService).createBooking(COMMUNITY_ID, SPOT_ID, RESIDENT_ID, VEHICLE_ID, TIME_RANGE);
+        verify(bookingService).createBooking(COMMUNITY_ID, SPOT_ID, RESIDENT_ID, VEHICLE_ID, TIME_RANGE, NOW);
     }
 
     @Test
@@ -136,7 +139,8 @@ class BookingControllerTest {
 
     @Test
     void returnsConflictForDataIntegrityViolation () throws Exception {
-        when(bookingService.createBooking(COMMUNITY_ID, SPOT_ID, RESIDENT_ID, VEHICLE_ID, TIME_RANGE))
+        when(clock.instant()).thenReturn(NOW);
+        when(bookingService.createBooking(COMMUNITY_ID, SPOT_ID, RESIDENT_ID, VEHICLE_ID, TIME_RANGE, NOW))
                 .thenThrow(new DataIntegrityViolationException("duplicate booking"));
 
         String requestJson = """

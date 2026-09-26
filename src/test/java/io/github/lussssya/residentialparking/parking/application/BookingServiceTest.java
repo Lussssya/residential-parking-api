@@ -42,6 +42,7 @@ class BookingServiceTest {
             Instant.parse("2026-08-30T10:00:00Z"),
             Instant.parse("2026-08-30T12:00:00Z")
     );
+    private static final Instant NOW = Instant.parse("2026-08-30T09:00:00Z");
 
     @Mock
     private ParkingSpotRepository parkingSpotRepository;
@@ -59,7 +60,14 @@ class BookingServiceTest {
         when(parkingSpotRepository.findById(SPOT_ID)).thenReturn(Optional.of(parkingSpot));
         when(parkingAvailabilityService.isAvailable(parkingSpot, TIME_RANGE)).thenReturn(true);
 
-        Booking result = bookingService.createBooking(COMMUNITY_ID, SPOT_ID, RESIDENT_ID, VEHICLE_ID, TIME_RANGE);
+        Booking result = bookingService.createBooking(
+                COMMUNITY_ID,
+                SPOT_ID,
+                RESIDENT_ID,
+                VEHICLE_ID,
+                TIME_RANGE,
+                NOW
+        );
 
         ArgumentCaptor<Booking> captor = ArgumentCaptor.forClass(Booking.class);
 
@@ -102,7 +110,14 @@ class BookingServiceTest {
 
         assertThrows(
                 NoSuchElementException.class,
-                () -> bookingService.createBooking(COMMUNITY_ID, SPOT_ID, RESIDENT_ID, VEHICLE_ID, TIME_RANGE)
+                () -> bookingService.createBooking(
+                        COMMUNITY_ID,
+                        SPOT_ID,
+                        RESIDENT_ID,
+                        VEHICLE_ID,
+                        TIME_RANGE,
+                        NOW
+                )
         );
 
         verifyNoInteractions(parkingAvailabilityService, bookingRepository);
@@ -116,7 +131,14 @@ class BookingServiceTest {
 
         assertThrows(
                 NoSuchElementException.class,
-                () -> bookingService.createBooking(COMMUNITY_ID, SPOT_ID, RESIDENT_ID, VEHICLE_ID, TIME_RANGE)
+                () -> bookingService.createBooking(
+                        COMMUNITY_ID,
+                        SPOT_ID,
+                        RESIDENT_ID,
+                        VEHICLE_ID,
+                        TIME_RANGE,
+                        NOW
+                )
         );
 
         verifyNoInteractions(parkingAvailabilityService, bookingRepository);
@@ -131,9 +153,40 @@ class BookingServiceTest {
 
         assertThrows(
                 IllegalStateException.class,
-                () -> bookingService.createBooking(COMMUNITY_ID, SPOT_ID, RESIDENT_ID, VEHICLE_ID, TIME_RANGE)
+                () -> bookingService.createBooking(
+                        COMMUNITY_ID,
+                        SPOT_ID,
+                        RESIDENT_ID,
+                        VEHICLE_ID,
+                        TIME_RANGE,
+                        NOW
+                )
         );
 
+        verifyNoInteractions(bookingRepository);
+    }
+
+    @Test
+    void rejectsBookingThatStartsInThePast () {
+        ParkingSpot parkingSpot = newParkingSpot(COMMUNITY_ID);
+        Instant afterStart = TIME_RANGE.start().plusSeconds(1);
+
+        when(parkingSpotRepository.findById(SPOT_ID)).thenReturn(Optional.of(parkingSpot));
+        when(parkingAvailabilityService.isAvailable(parkingSpot, TIME_RANGE)).thenReturn(true);
+
+        IllegalStateException exception = assertThrows(
+                IllegalStateException.class,
+                () -> bookingService.createBooking(
+                        COMMUNITY_ID,
+                        SPOT_ID,
+                        RESIDENT_ID,
+                        VEHICLE_ID,
+                        TIME_RANGE,
+                        afterStart
+                )
+        );
+
+        assertEquals("Booking should not be in the past", exception.getMessage());
         verifyNoInteractions(bookingRepository);
     }
 
@@ -142,23 +195,23 @@ class BookingServiceTest {
         assertAll(
                 () -> assertThrows(
                         NullPointerException.class,
-                        () -> bookingService.createBooking(null, SPOT_ID, RESIDENT_ID, VEHICLE_ID, TIME_RANGE)
+                        () -> bookingService.createBooking(null, SPOT_ID, RESIDENT_ID, VEHICLE_ID, TIME_RANGE, NOW)
                 ),
                 () -> assertThrows(
                         NullPointerException.class,
-                        () -> bookingService.createBooking(COMMUNITY_ID, null, RESIDENT_ID, VEHICLE_ID, TIME_RANGE)
+                        () -> bookingService.createBooking(COMMUNITY_ID, null, RESIDENT_ID, VEHICLE_ID, TIME_RANGE, NOW)
                 ),
                 () -> assertThrows(
                         NullPointerException.class,
-                        () -> bookingService.createBooking(COMMUNITY_ID, SPOT_ID, null, VEHICLE_ID, TIME_RANGE)
+                        () -> bookingService.createBooking(COMMUNITY_ID, SPOT_ID, null, VEHICLE_ID, TIME_RANGE, NOW)
                 ),
                 () -> assertThrows(
                         NullPointerException.class,
-                        () -> bookingService.createBooking(COMMUNITY_ID, SPOT_ID, RESIDENT_ID, null, TIME_RANGE)
+                        () -> bookingService.createBooking(COMMUNITY_ID, SPOT_ID, RESIDENT_ID, null, TIME_RANGE, NOW)
                 ),
                 () -> assertThrows(
                         NullPointerException.class,
-                        () -> bookingService.createBooking(COMMUNITY_ID, SPOT_ID, RESIDENT_ID, VEHICLE_ID, null)
+                        () -> bookingService.createBooking(COMMUNITY_ID, SPOT_ID, RESIDENT_ID, VEHICLE_ID, null, NOW)
                 )
         );
 

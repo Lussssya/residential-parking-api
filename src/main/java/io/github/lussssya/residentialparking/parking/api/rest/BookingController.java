@@ -28,7 +28,9 @@ public class BookingController {
                 request.spotId(),
                 request.residentId(),
                 request.vehicleId(),
-                timeRange);
+                timeRange,
+                Instant.now(clock)
+        );
 
         return BookingResponse.from(booking);
     }

@@ -21,7 +21,7 @@ public class BookingService {
     private final ParkingAvailabilityService parkingAvailabilityService;
 
     @Transactional
-    public Booking createBooking (UUID communityId, UUID spotId, UUID residentId, UUID vehicleId, TimeRange timeRange) {
+    public Booking createBooking (UUID communityId, UUID spotId, UUID residentId, UUID vehicleId, TimeRange timeRange, Instant now) {
         Objects.requireNonNull(communityId, "Community ID should not be null.");
         Objects.requireNonNull(spotId, "Parking spot ID should not be null.");
         Objects.requireNonNull(residentId, "Resident ID should not be null.");
@@ -40,7 +40,15 @@ public class BookingService {
             throw new IllegalStateException("Parking spot is not available for the requested time.");
         }
 
-        final Booking booking = new Booking(UUID.randomUUID(), communityId, spotId, residentId, vehicleId, timeRange);
+        final Booking booking = Booking.create(
+                UUID.randomUUID(),
+                communityId,
+                spotId,
+                residentId,
+                vehicleId,
+                timeRange,
+                now
+        );
         bookingRepository.save(booking);
         return booking;
     }
