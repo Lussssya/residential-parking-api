@@ -35,6 +35,13 @@ public class BookingController {
         return BookingResponse.from(booking);
     }
 
+    @PutMapping("/bookings/{bookingId}/activate")
+    public BookingResponse activateBooking (@PathVariable UUID bookingId) {
+        Booking booking = bookingService.activateBooking(bookingId, Instant.now(clock));
+
+        return BookingResponse.from(booking);
+    }
+
     @GetMapping("/residents/{residentId}/bookings")
     public ResidentBookingsResponse findCurrentAndFutureBookings (@PathVariable UUID residentId) {
         return ResidentBookingsResponse.from(
@@ -48,6 +55,13 @@ public class BookingController {
     @PostMapping("/bookings/{bookingId}/cancel")
     public BookingResponse cancelBooking (@PathVariable UUID bookingId) {
         Booking booking = bookingService.cancelBooking(bookingId, Instant.now(clock));
+
+        return BookingResponse.from(booking);
+    }
+
+    @PostMapping("/bookings/{bookingId}/finish")
+    public BookingResponse finishBooking (@PathVariable UUID bookingId) {
+        Booking booking = bookingService.finishBooking(bookingId, Instant.now(clock));
 
         return BookingResponse.from(booking);
     }

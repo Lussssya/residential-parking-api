@@ -15,7 +15,9 @@ public record BookingResponse(
         Instant start,
         Instant end,
         Instant checkInDeadline,
-        BookingStatus status
+        BookingStatus status,
+        Instant actualStartTime,
+        Instant actualFinishTime
 ) {
     public static BookingResponse from (Booking booking) {
         return new BookingResponse(
@@ -27,7 +29,9 @@ public record BookingResponse(
                 booking.getTimeRange().start(),
                 booking.getTimeRange().end(),
                 booking.getCheckInDeadline(),
-                booking.getStatus()
+                booking.getStatus(),
+                booking.getActualStartTime(),
+                booking.getActualFinishTime()
         );
     }
 }

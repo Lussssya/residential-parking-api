@@ -2,6 +2,7 @@ package io.github.lussssya.residentialparking.parking.application;
 
 import io.github.lussssya.residentialparking.parking.domain.model.Booking;
 import io.github.lussssya.residentialparking.parking.domain.model.ParkingSpot;
+import io.github.lussssya.residentialparking.parking.domain.model.ParkingSpotStatus;
 import io.github.lussssya.residentialparking.parking.domain.model.TimeRange;
 import io.github.lussssya.residentialparking.parking.domain.repository.BookingRepository;
 import io.github.lussssya.residentialparking.parking.domain.repository.ParkingSpotRepository;
@@ -53,6 +54,34 @@ public class BookingService {
         return booking;
     }
 
+    @Transactional
+    public Booking activateBooking (UUID bookingId, Instant activatedAt) {
+        Objects.requireNonNull(bookingId, "Booking Id should not be null.");
+        Objects.requireNonNull(activatedAt, "Activation time should not be null.");
+
+        Booking booking = bookingRepository.findById(bookingId).orElseThrow(
+                () -> new NoSuchElementException("No booking with such Id.")
+        );
+
+        final UUID parkingSpotId = booking.getSpotId();
+        ParkingSpot parkingSpot = parkingSpotRepository.findById(parkingSpotId).orElseThrow(
+                () -> new NoSuchElementException("No parking spot with such Id.")
+        );
+
+        if (parkingSpot.getStatus() != ParkingSpotStatus.ACTIVE) {
+            throw new IllegalStateException("Parking spot is not active.");
+        }
+
+        if (bookingRepository.existsActivatedBySpotId(parkingSpotId)) {
+            throw new IllegalStateException("Parking spot is currently occupied.");
+        }
+
+        booking.activate(activatedAt);
+        bookingRepository.save(booking);
+
+        return booking;
+    }
+
     @Transactional(readOnly = true)
     public ResidentBookings findCurrentAndFutureBookings (UUID residentId, Instant now) {
         Objects.requireNonNull(residentId, "Resident Id should not be null.");
@@ -84,6 +113,32 @@ public class BookingService {
 
         booking.cancel(now);
         bookingRepository.save(booking);
+        return booking;
+    }
+
+    @Transactional
+    public void expireOverdueBookings (Instant now) {
+        Objects.requireNonNull(now, "Current time should not be null.");
+
+        List<Booking> bookings = bookingRepository.findAllConfirmedWithOverdueCheckin(now);
+        for (Booking booking : bookings) {
+            booking.expire(now);
+            bookingRepository.save(booking);
+        }
+    }
+
+    @Transactional
+    public Booking finishBooking (UUID bookingId, Instant now) {
+        Objects.requireNonNull(bookingId, "Booking Id should not be null.");
+        Objects.requireNonNull(now, "Current time should not be null.");
+
+        Booking booking = bookingRepository.findById(bookingId).orElseThrow(
+                () -> new NoSuchElementException("No booking with such Id.")
+        );
+
+        booking.complete(now);
+        bookingRepository.save(booking);
+
         return booking;
     }
 }

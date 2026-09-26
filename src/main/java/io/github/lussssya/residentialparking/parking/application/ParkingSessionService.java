@@ -72,7 +72,7 @@ public class ParkingSessionService {
                 () -> new NoSuchElementException("No booking with such Id.")
         );
 
-        booking.complete();
+        booking.complete(finishedAt);
         bookingRepository.save(booking);
 
         parkingSession.finish(finishedAt);

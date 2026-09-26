@@ -108,19 +108,19 @@ class BookingTest {
     }
 
     @Test
-    void marksBookingUsedAtStart () {
+    void marksBookingActivatedAtStart () {
         Booking booking = newBooking();
         booking.activate(START);
 
-        assertEquals(BookingStatus.USED, booking.getStatus());
+        assertEquals(BookingStatus.ACTIVATED, booking.getStatus());
     }
 
     @Test
-    void marksBookingUsedDuringGracePeriod () {
+    void marksBookingActivatedDuringGracePeriod () {
         Booking booking = newBooking();
         booking.activate(DURING_GRACE_PERIOD);
 
-        assertEquals(BookingStatus.USED, booking.getStatus());
+        assertEquals(BookingStatus.ACTIVATED, booking.getStatus());
     }
 
     @Test
@@ -206,7 +206,7 @@ class BookingTest {
         booking.activate(DURING_GRACE_PERIOD);
 
         assertAllTransitionsRejected(booking);
-        assertEquals(BookingStatus.USED, booking.getStatus());
+        assertEquals(BookingStatus.ACTIVATED, booking.getStatus());
     }
 
     @Test

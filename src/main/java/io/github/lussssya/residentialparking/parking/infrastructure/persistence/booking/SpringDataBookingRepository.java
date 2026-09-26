@@ -39,4 +39,6 @@ public interface SpringDataBookingRepository extends JpaRepository<BookingJpaEnt
               AND booking.status = :status
             """)
     List<BookingJpaEntity> findAllConfirmedAndStarted (Instant now, BookingStatus status);
+
+    boolean existsBySpotIdAndStatus (UUID spotId, BookingStatus status);
 }

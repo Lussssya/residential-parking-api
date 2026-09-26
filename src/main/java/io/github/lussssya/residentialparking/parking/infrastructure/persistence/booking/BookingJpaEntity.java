@@ -30,12 +30,27 @@ public class BookingJpaEntity {
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 20)
     private BookingStatus status;
+    @Column(name = "actual_start_time")
+    private Instant actualStartTime;
+    @Column(name = "actual_finish_time")
+    private Instant actualFinishTime;
 
     protected BookingJpaEntity () {
         // Required by JPA
     }
 
-    private BookingJpaEntity (UUID id, UUID communityId, UUID spotId, UUID residentId, UUID vehicleId, Instant startTime, Instant endTime, BookingStatus status) {
+    private BookingJpaEntity (
+            UUID id,
+            UUID communityId,
+            UUID spotId,
+            UUID residentId,
+            UUID vehicleId,
+            Instant startTime,
+            Instant endTime,
+            BookingStatus status,
+            Instant actualStartTime,
+            Instant actualFinishTime
+    ) {
         this.id = id;
         this.communityId = communityId;
         this.spotId = spotId;
@@ -44,6 +59,8 @@ public class BookingJpaEntity {
         this.startTime = startTime;
         this.endTime = endTime;
         this.status = status;
+        this.actualStartTime = actualStartTime;
+        this.actualFinishTime = actualFinishTime;
     }
 
     public static BookingJpaEntity fromDomain (Booking booking) {
@@ -57,12 +74,24 @@ public class BookingJpaEntity {
                 booking.getVehicleId(),
                 booking.getTimeRange().start(),
                 booking.getTimeRange().end(),
-                booking.getStatus()
+                booking.getStatus(),
+                booking.getActualStartTime(),
+                booking.getActualFinishTime()
         );
     }
 
     public Booking toDomain () {
         TimeRange timeRange = new TimeRange(startTime, endTime);
-        return Booking.fromExistingState(id, communityId, spotId, residentId, vehicleId, timeRange, status);
+        return Booking.fromExistingState(
+                id,
+                communityId,
+                spotId,
+                residentId,
+                vehicleId,
+                timeRange,
+                status,
+                actualStartTime,
+                actualFinishTime
+        );
     }
 }

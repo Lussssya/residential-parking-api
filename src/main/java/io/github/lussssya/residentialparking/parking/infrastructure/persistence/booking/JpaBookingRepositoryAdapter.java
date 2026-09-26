@@ -64,4 +64,9 @@ public class JpaBookingRepositoryAdapter implements BookingRepository {
 
         bookingRepository.save(bookingJpaEntity);
     }
+
+    @Override
+    public boolean existsActivatedBySpotId (UUID parkingSpotId) {
+        return bookingRepository.existsBySpotIdAndStatus(parkingSpotId, BookingStatus.ACTIVATED);
+    }
 }

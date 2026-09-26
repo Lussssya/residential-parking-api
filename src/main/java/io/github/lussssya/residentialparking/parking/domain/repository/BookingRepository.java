@@ -18,4 +18,6 @@ public interface BookingRepository {
     List<Booking> findAllConfirmedWithOverdueCheckin (Instant now);
 
     void save (Booking booking);
+
+    boolean existsActivatedBySpotId (UUID parkingSpotId);
 }
