@@ -4,7 +4,11 @@ ALTER TABLE bookings
 
 UPDATE bookings AS booking
 SET actual_start_time = parking_session.started_at,
-    actual_finish_time = parking_session.finished_at
+    actual_finish_time = parking_session.finished_at,
+    status = CASE parking_session.status
+                 WHEN 'FINISHED' THEN 'COMPLETED'
+                 ELSE 'ACTIVATED'
+             END
 FROM parking_sessions AS parking_session
 WHERE parking_session.booking_id = booking.id;
 
